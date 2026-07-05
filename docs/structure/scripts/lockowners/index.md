@@ -7,6 +7,7 @@ Contrôle d'accès Git : vérifie que les fichiers modifiés respectent les verr
 | Fichier | Rôle |
 |---------|------|
 | `scripts/lockowners/check-locks.js` | Script de vérification des droits sur les fichiers modifiés |
+| `scripts/lockowners/lib/` | Modules spécifiques CI (diff Git, contrôle d'accès) |
 | `.lockowners` | Liste des chemins verrouillés et de leurs propriétaires (racine du dépôt) |
 | `.env` | Pseudo GitHub local pour `npm run lockowners` (non versionné) |
 | `.env.example` | Modèle des variables d'environnement |
@@ -44,6 +45,16 @@ chemin/ou/dossier @Pseudo1 @Pseudo2
 | `scripts/lockowners/ @S-TH0MAS @collaborateur` | @S-TH0MAS ou @collaborateur peuvent modifier `scripts/lockowners/` |
 
 Les lignes commençant par `#` sont ignorées.
+
+### Modules `lib/`
+
+| Module | Rôle |
+|--------|------|
+| `constants.js` | Utilisateur administrateur (bypass des vérifications) |
+| `git-diff.js` | Liste des fichiers modifiés entre `HEAD~1` et `HEAD` |
+| `access.js` | Détection des violations d'accès sur les fichiers modifiés |
+
+Le parse du fichier `.lockowners` est partagé via `scripts/lib/lockowners.js`.
 
 ## Exécution
 

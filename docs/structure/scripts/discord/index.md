@@ -1,75 +1,116 @@
 # Discord
 
-Script de configuration automatique du serveur Discord du projet.
+Scripts d'infrastructure et bot Discord du projet MSP2-Project.
 
-## Fichiers
+## Arborescence
 
-| Fichier | Rôle |
-|---------|------|
-| `scripts/discord/configure.js` | Déploie catégories, salons et synchronise les fichiers |
-| `scripts/discord/data.js` | Configuration Discord et constante `FILES_DIR` |
+```
+scripts/discord/
+├── configure.js          # CI — déploie salons et synchronise les fichiers
+├── bot-server.js           # Dev — bot persistant (/lock-panel)
+├── deploy-commands.js      # Enregistre les commandes slash
+├── config/
+│   └── data.js             # Catégories, salons, mots-clés sync
+├── commands/
+│   ├── index.js            # Registre des commandes slash
+│   └── lock-panel.js       # /lock-panel — verrous GitOps
+├── lib/
+│   ├── sync/               # Logique configure.js (infrastructure)
+│   └── bot/                # Logique bot-server.js (runtime)
+├── build/
+│   ├── run.js              # Lance le build Vite
+│   ├── standalone.mjs      # Entrée du bundle
+│   ├── vite.config.mjs
+│   └── stubs/              # Modules natifs optionnels (bundle)
+└── dist/                   # Sortie build (gitignoré)
+```
+
+## Points d'entrée
+
+| Script | Rôle | Commande |
+|--------|------|----------|
+| `configure.js` | Catégories, salons, sync fichiers `docs/` | CI ou `node scripts/discord/configure.js` |
+| `bot-server.js` | Écoute les interactions Discord | `node scripts/discord/bot-server.js` |
+| `deploy-commands.js` | Publie les slash commands | `node scripts/discord/deploy-commands.js` |
+| `build/run.js` | Bundle standalone + `.env` intégré | `node scripts/discord/build/run.js` |
+
+## Modules `lib/sync/` (infrastructure)
+
+| Module | Rôle |
+|--------|------|
+| `channels.js` | Types de salons et permissions lecture seule |
+| `files.js` | Convention `*.mot-clé.discord.*`, indexation |
+| `git.js` | Message Discord = dernier commit Git |
+| `messages.js` | Pagination de l'historique d'un salon |
+| `sync.js` | Synchronisation fichiers ↔ messages |
+
+## Modules `lib/bot/` (runtime)
+
+| Module | Rôle |
+|--------|------|
+| `env.js` | Variables Discord (`scripts/lib/env` + validation) |
+| `commands.js` | Chargement des commandes slash |
+| `github.js` | API GitHub — `.lockowners`, collaborateurs |
+| `validate-lock.js` | Validation des nouveaux verrous (UI Discord) |
+| `owner-selection.js` | UI tableau de sélection des propriétaires |
+
+Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
 
 ## Prérequis
 
 | Élément | Détail |
 |---------|--------|
-| Node.js | Environnement d'exécution |
-| `discord.js` | Dépendance de développement (`package.json`) |
-| `DISCORD_BOT_TOKEN` | Token du bot Discord (variable d'environnement) |
-| `DISCORD_GUILD_ID` | Identifiant du serveur cible (variable d'environnement) |
-| Git | Recommandé — le message Discord reprend la description du dernier commit |
+| Node.js 20+ | Environnement d'exécution |
+| `discord.js`, `@octokit/rest` | `package.json` |
+| `DISCORD_BOT_TOKEN` | Token du bot |
+| `DISCORD_GUILD_ID` | ID du serveur (configure + deploy) |
+| `GITHUB_TOKEN` | PAT GitHub (`/lock-panel`) |
+| Git | Recommandé — message sync = dernier commit |
 
-## Fonctionnement
+## Variables (`.env` à la racine)
 
-Le script `configure.js` :
+| Variable | Requis pour |
+|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Tous les scripts |
+| `DISCORD_GUILD_ID` | `configure.js`, `deploy-commands.js` |
+| `GITHUB_TOKEN` | `/lock-panel`, build standalone |
 
-1. **Catégories & salons** — crée l'infrastructure définie dans `data.js` ;
-2. **Recherche de fichiers** — parcourt récursivement `FILES_DIR` (`docs/`) ;
-3. **Filtrage par mot-clé** — sélectionne les fichiers nommés `filename.{mot-clé}.discord.ext` ;
-4. **Envoi Discord** — téléverse chaque fichier dans le salon configuré avec le mot-clé correspondant ;
-5. **Suppression** — supprime les messages dont la pièce jointe gérée n'existe plus localement ;
-6. **Message** — contenu = description du dernier commit Git du fichier.
+## `configure.js` — synchronisation
 
-Seules les pièces jointes correspondant à la convention `filename.{mot-clé}.discord.ext` et aux mots-clés du salon sont gérées. Les autres messages du salon ne sont pas touchés.
+1. Crée l'infrastructure définie dans `config/data.js`
+2. Parcourt `FILES_DIR` (`docs/`) pour les fichiers `filename.{mot-clé}.discord.ext`
+3. Envoie les pièces jointes dans le salon correspondant au mot-clé
+4. Supprime les messages dont le fichier local a disparu
+5. Contenu du message = description du dernier commit Git
 
-## Convention de nommage
-
-```
-filename.{mot-clé}.discord.{extension}
-```
-
-| Exemple | Mot-clé | Salon cible |
-|---------|---------|-------------|
-| `first_preview.init.discord.pdf` | `init` | 🚀┃initialisation |
-| `specs.conception.discord.pdf` | `conception` | 📝┃conception |
-
-## Configuration (`data.js`)
+## Configuration (`config/data.js`)
 
 | Champ | Description |
 |-------|-------------|
-| `FILES_DIR` | Dossier racine de recherche des fichiers (défaut : `docs`) |
-| `name` | Nom de la catégorie ou du salon |
-| `type` | `'text'` (défaut) ou `'voice'` |
-| `read_only` | Si `true`, interdit l'envoi de messages au rôle `@everyone` |
-| `sync_files` | Liste de **mots-clés métier** (ex. `['init']`) |
+| `FILES_DIR` | Racine de recherche (défaut : `docs`) |
+| `name` | Nom catégorie ou salon |
+| `type` | `'text'` ou `'voice'` |
+| `read_only` | Interdit l'envoi de messages à `@everyone` |
+| `sync_files` | Mots-clés métier (`['init']`, etc.) |
 
-```js
-const FILES_DIR = 'docs';
-
-sync_files: ['init'],  // envoie *.init.discord.* vers ce salon
-```
-
-### Catégories configurées
+### Salons configurés
 
 | Catégorie | Salons |
 |-----------|--------|
-| 🏠 GENERAL | 💬┃chat, 📊┃suivie-du-projet (lecture seule), 🔊┃chat-audio-general (vocal) |
+| 🏠 GENERAL | 💬┃chat, 📊┃suivie-du-projet (lecture seule), 🔊┃chat-audio-general |
 | 💡 CONCEPTION | 🚀┃initialisation (`init`), 📝┃conception (`conception`) |
 
-## Exécution
+## Build standalone
 
 ```bash
-DISCORD_BOT_TOKEN=... DISCORD_GUILD_ID=... node scripts/discord/configure.js
+node scripts/discord/build/run.js   # lit .env racine — DISCORD_BOT_TOKEN + GITHUB_TOKEN requis
 ```
 
-Le script se déconnecte automatiquement une fois la synchronisation terminée.
+Produit `scripts/discord/dist/index.js` (~1,5 Mo, minifié, `.env` inclus) et `index.js.gz`.
+
+```bash
+gunzip -k index.js.gz
+node index.js
+```
+
+⚠️ `index.js` contient vos tokens — ne le partagez pas. `dist/` est gitignoré.
