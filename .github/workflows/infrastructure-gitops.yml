@@ -13,8 +13,10 @@ on:
 jobs:
   # -------------------------------------------------------------
   # Job 1 : Exécuté sur TOUTES les branches et Pull Requests
+  # Sauf push dont le message commence par "chore" (ex. verrous via Discord)
   # -------------------------------------------------------------
   check-security-locks:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore')
     runs-on: ubuntu-latest
     steps:
       - name: Récupération du Code source
@@ -45,9 +47,11 @@ jobs:
   sync-discord:
     runs-on: ubuntu-latest
     needs: check-security-locks
-    # 💡 Ne se lance pas si c'est une Pull Request (on attend la fusion)
-    # et filtre strictement sur les branches cibles main et dev
-    if: (github.ref_name == 'main' || github.ref_name == 'dev')
+    # 💡 Push sur main/dev uniquement — pas les PR, pas les commits "chore*" (bot Discord)
+    if: |
+      github.event_name == 'push' &&
+      (github.ref_name == 'main' || github.ref_name == 'dev') &&
+      !startsWith(github.event.head_commit.message, 'chore')
 
     steps:
       - name: Checkout Code (Avec tout l'historique Git)
