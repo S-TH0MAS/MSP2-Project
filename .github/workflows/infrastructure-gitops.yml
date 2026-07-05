@@ -47,7 +47,7 @@ jobs:
     needs: check-security-locks
     # 💡 Ne se lance pas si c'est une Pull Request (on attend la fusion)
     # et filtre strictement sur les branches cibles main et dev
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev')
+    if: (github.ref_name == 'main' || github.ref_name == 'dev')
 
     steps:
       - name: Checkout Code (Avec tout l'historique Git)
