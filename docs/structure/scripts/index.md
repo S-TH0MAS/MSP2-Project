@@ -8,9 +8,11 @@ Le dossier `scripts/` regroupe les scripts exécutables manuellement ou en CI po
 
 ```
 scripts/
-└── discord/
-    ├── configure.js
-    └── data.js
+├── discord/
+│   ├── configure.js
+│   └── data.js
+└── lockowners/
+    └── check-locks.js
 ```
 
 ## Sous-sections
@@ -18,3 +20,4 @@ scripts/
 | Section | Description |
 |---------|-------------|
 | [Discord](discord/index.md) | Déploiement de l'infrastructure Discord (salons, synchronisation de fichiers) |
+| [Lockowners](lockowners/index.md) | Contrôle d'accès Git via `.lockowners` |

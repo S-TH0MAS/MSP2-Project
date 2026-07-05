@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "lockowners": "node scripts/lockowners/check-locks.js"
+  },
   "devDependencies": {
     "discord.js": "^14.26.4"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
   }
 }

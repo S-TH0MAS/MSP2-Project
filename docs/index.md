@@ -8,6 +8,7 @@ Bienvenue dans la documentation du projet. Chaque dossier possède un `index.md`
 |---------|-------------|
 | [Structure](structure/index.md) | Organisation générale du dépôt, rôles des dossiers et conventions |
 | [Conception](conception/index.md) | Phase de conception — cadrage produit et premiers jets |
+| [Env](env/index.md) | Variables d'environnement locales (`.env`) |
 
 ## Conventions
 

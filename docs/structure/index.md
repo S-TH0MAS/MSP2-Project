@@ -11,6 +11,7 @@ MSP2-Project/
 ├── README.md         Point d'entrée du dépôt
 ├── docs/             Documentation (arborescence index.md)
 ├── scripts/          Scripts utilitaires (automatisation, outillage)
+├── .env.example      Modèle des variables d'environnement
 └── …                 À définir (src/, tests/, config/, etc.)
 ```
 
@@ -22,6 +23,7 @@ MSP2-Project/
 | `docs/` | Documentation structurée du projet |
 | `scripts/` | Scripts d'automatisation et d'infrastructure |
 | `docs/conception/` | Documents de conception (présentations, specs) |
+| `.env` / `.env.example` | Variables d'environnement locales — voir [docs/env](../env/index.md) |
 
 ## Sous-sections
 
