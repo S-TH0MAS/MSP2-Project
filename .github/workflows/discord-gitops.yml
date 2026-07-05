@@ -3,11 +3,11 @@ name: Discord Infrastructure & Files GitOps
 on:
   push:
     branches:
-      - main # Déclenche le script lors d'un push sur main
-      - dev  # Déclenche aussi le script lors d'un push sur dev
+      - main
+      - dev
     paths:
-      - 'scripts/configure.js'
-      - 'scripts/data.js'
+      - 'scripts/discord/configure.js'
+      - 'scripts/discord/data.js'
       - 'docs/**'
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
       - name: Checkout Code (Avec tout l'historique Git)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Nécessaire pour le fonctionnement de git log dans votre script
+          fetch-depth: 0
 
       - name: Configuration de Node.js
         uses: actions/setup-node@v4
@@ -27,12 +27,10 @@ jobs:
           cache: 'npm'
 
       - name: Installation des dépendances
-        run: |
-          cd scripts
-          if [ -f package-lock.json ]; then npm ci; else npm install discord.js; fi
+        run: npm ci
 
       - name: Déploiement de l'Infrastructure et Synchronisation des Fichiers
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
-        run: node scripts/configure.js
+        run: node scripts/discord/configure.js

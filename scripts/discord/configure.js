@@ -85,9 +85,9 @@ function getCommitMessage(filePath) {
     return `📄 ${path.basename(filePath)}`;
 }
 
-/** Récupère tous les noms de pièces jointes déjà envoyés dans le salon. */
-async function fetchSentAttachmentNames(channel) {
-    const sentNames = new Set();
+/** Récupère tous les messages du salon. */
+async function fetchAllMessages(channel) {
+    const messages = [];
     let lastId;
 
     while (true) {
@@ -97,38 +97,75 @@ async function fetchSentAttachmentNames(channel) {
         const batch = await channel.messages.fetch(options);
         if (batch.size === 0) break;
 
-        for (const msg of batch.values()) {
-            for (const att of msg.attachments.values()) {
-                sentNames.add(att.name);
-            }
-        }
-
+        messages.push(...batch.values());
         lastId = batch.last().id;
         if (batch.size < 100) break;
     }
 
-    return sentNames;
+    return messages;
 }
 
-/** Vérifie si un fichier a déjà été envoyé dans le salon (par nom de pièce jointe). */
-function wasAlreadySent(sentNames, fileName) {
-    return sentNames.has(fileName);
+/** Retourne les noms de fichiers locaux attendus pour un salon. */
+function getLocalFileNames(chanData, filesByKey) {
+    const names = new Set();
+
+    for (const key of getSyncKeys(chanData.sync_files)) {
+        for (const filePath of filesByKey.get(key) || []) {
+            names.add(path.basename(filePath));
+        }
+    }
+
+    return names;
+}
+
+/** Indique si une pièce jointe est gérée par la synchronisation du salon. */
+function isManagedAttachment(fileName, syncKeys) {
+    const parsed = parseDiscordFile(fileName);
+    return parsed !== null && syncKeys.includes(parsed.key);
 }
 
 /** Synchronise les fichiers correspondant aux mots-clés métier vers un salon Discord. */
-async function syncChannelFiles(channel, chanData, filesByKey, sentNames) {
-    for (const key of getSyncKeys(chanData.sync_files)) {
+async function syncChannelFiles(channel, chanData, filesByKey) {
+    const syncKeys = getSyncKeys(chanData.sync_files);
+    const localFileNames = getLocalFileNames(chanData, filesByKey);
+    const messages = await fetchAllMessages(channel);
+    const sentNames = new Set();
+
+    for (const msg of messages) {
+        if (msg.attachments.size === 0) continue;
+
+        const attachments = [...msg.attachments.values()];
+        const managed = attachments.filter(att => isManagedAttachment(att.name, syncKeys));
+        if (managed.length === 0) continue;
+
+        const isStale = managed.some(att => !localFileNames.has(att.name));
+
+        if (isStale) {
+            try {
+                await msg.delete();
+                console.log(`    🗑️ Supprimé (fichier absent localement) : ${managed.map(a => a.name).join(', ')}`);
+            } catch (err) {
+                console.error(`    ❌ Erreur suppression : ${managed.map(a => a.name).join(', ')}`, err);
+            }
+            continue;
+        }
+
+        for (const att of managed) {
+            sentNames.add(att.name);
+        }
+    }
+
+    for (const key of syncKeys) {
         const files = filesByKey.get(key) || [];
 
         if (files.length === 0) {
             console.log(`    ℹ️ Aucun fichier pour le mot-clé "${key}" dans ${config.FILES_DIR}/`);
-            continue;
         }
 
         for (const filePath of files) {
             const fileName = path.basename(filePath);
 
-            if (wasAlreadySent(sentNames, fileName)) {
+            if (sentNames.has(fileName)) {
                 console.log(`    ℹ️ Déjà synchronisé : ${fileName}`);
                 continue;
             }
@@ -191,8 +228,7 @@ client.once('ready', async () => {
                 }
 
                 if (chanData.sync_files && channelType === ChannelType.GuildText) {
-                    const sentNames = await fetchSentAttachmentNames(channel);
-                    await syncChannelFiles(channel, chanData, filesByKey, sentNames);
+                    await syncChannelFiles(channel, chanData, filesByKey);
                 }
             }
         }

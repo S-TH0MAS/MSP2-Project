@@ -27,9 +27,10 @@ Le script `configure.js` :
 2. **Recherche de fichiers** — parcourt récursivement `FILES_DIR` (`docs/`) ;
 3. **Filtrage par mot-clé** — sélectionne les fichiers nommés `filename.{mot-clé}.discord.ext` ;
 4. **Envoi Discord** — téléverse chaque fichier dans le salon configuré avec le mot-clé correspondant ;
-5. **Message** — contenu = description du dernier commit Git du fichier.
+5. **Suppression** — supprime les messages dont la pièce jointe gérée n'existe plus localement ;
+6. **Message** — contenu = description du dernier commit Git du fichier.
 
-Les fichiers déjà présents dans l'historique complet du salon (même nom de pièce jointe) ne sont pas renvoyés.
+Seules les pièces jointes correspondant à la convention `filename.{mot-clé}.discord.ext` et aux mots-clés du salon sont gérées. Les autres messages du salon ne sont pas touchés.
 
 ## Convention de nommage
 
