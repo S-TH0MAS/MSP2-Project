@@ -2,17 +2,17 @@ name: Infrastructure GitOps
 
 on:
   push:
-    # 💡 On retire le filtre de branche global ici pour écouter TOUTES les branches
-    paths:
-      - 'scripts/discord/configure.js'
-      - 'scripts/discord/data.js'
-      - 'docs/**'
-      - '.lockowners'
-      - 'scripts/lockowners/check-locks.js'
+    branches:
+      - main
+      - dev
+  pull_request:
+    # 💡 Déclenche le workflow sur toutes les PR pour valider les verrous,
+    # peu importe les fichiers modifiés (évite le blocage infini en jaune)
+    types: [opened, synchronize, reopened]
 
 jobs:
   # -------------------------------------------------------------
-  # Job 1 : Exécuté sur ABSOLUMENT TOUTES les branches
+  # Job 1 : Exécuté sur TOUTES les branches et Pull Requests
   # -------------------------------------------------------------
   check-security-locks:
     runs-on: ubuntu-latest
@@ -20,6 +20,8 @@ jobs:
       - name: Récupération du Code source
         uses: actions/checkout@v4
         with:
+          # 💡 Récupère le bon commit de la PR si l'événement est une Pull Request
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 2
 
       - name: Configuration de Node.js (v24)
@@ -43,8 +45,9 @@ jobs:
   sync-discord:
     runs-on: ubuntu-latest
     needs: check-security-locks
-    # 💡 Cette condition magique bloque l'exécution si on est sur une autre branche
-    if: github.ref_name == 'main' || github.ref_name == 'dev'
+    # 💡 Ne se lance pas si c'est une Pull Request (on attend la fusion)
+    # et filtre strictement sur les branches cibles main et dev
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev')
 
     steps:
       - name: Checkout Code (Avec tout l'historique Git)
