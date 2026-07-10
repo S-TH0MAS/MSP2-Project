@@ -1,14 +1,16 @@
 const {
     SlashCommandBuilder,
     ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
+    ModalBuilder,
 } = require('discord.js');
 const { resolvePathForSync } = require('../lib/bot/lock-sync');
 const { fetchLockownersFile, listCollaborators, syncLockownersLine } = require('../lib/bot/github');
+const { isLockPanelChannel, getLockPanelChannelName } = require('../lib/bot/channels-config');
+const { logLockownersAction } = require('../lib/bot/audit-log');
+const { scheduleEphemeralCleanup } = require('../lib/bot/ephemeral');
+const { OPEN_LOCK_MODAL, buildLockPanelPayload } = require('../lib/bot/lock-panel-ui');
 const {
     CUSTOM_IDS,
     parseToggleLogin,
@@ -40,6 +42,23 @@ function startSession(userId, path, logins, existingOwners = []) {
     return session;
 }
 
+function denyWrongChannel(interaction) {
+    const channelName = getLockPanelChannelName() ?? '🔒┃lockowners';
+    return interaction.reply({
+        content: `❌ **Échec** — Utilisez le message épinglé dans **${channelName}**.`,
+        ephemeral: true,
+    });
+}
+
+async function sendEphemeralResult(interaction, content) {
+    if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content, components: [] });
+    } else {
+        await interaction.reply({ content, ephemeral: true });
+    }
+    scheduleEphemeralCleanup(interaction);
+}
+
 async function commitSync(interaction, session) {
     const { path, selected, initialOwners } = session;
     const { locks } = await fetchLockownersFile();
@@ -47,60 +66,67 @@ async function commitSync(interaction, session) {
 
     if (resolution.action === 'error') {
         clearSession(interaction.user.id);
-        await interaction.editReply({ content: resolution.message, components: [] });
+        await sendEphemeralResult(interaction, resolution.message);
         return;
     }
 
     const selectedOwners = [...selected];
+    const initialOwnerList = [...initialOwners];
     const isRemoval = selectedOwners.length === 0;
     const hadExisting = initialOwners.size > 0;
 
     await syncLockownersLine(path, selectedOwners);
     clearSession(interaction.user.id);
 
+    await logLockownersAction(interaction.guild, {
+        discordUser: interaction.user.tag,
+        path,
+        initialOwners: initialOwnerList,
+        selectedOwners,
+        isRemoval,
+        hadExisting,
+    });
+
     if (isRemoval && hadExisting) {
-        await interaction.editReply({
-            content: `✅ **Réussite** — Le verrou sur \`${path}\` a été retiré.`,
-            components: [],
-        });
+        await sendEphemeralResult(
+            interaction,
+            `✅ **Réussite** — Le verrou sur \`${path}\` a été retiré.`,
+        );
         return;
     }
 
     if (isRemoval) {
-        await interaction.editReply({
-            content: `ℹ️ Aucun verrou à retirer pour \`${path}\`.`,
-            components: [],
-        });
+        await sendEphemeralResult(
+            interaction,
+            `ℹ️ Aucun verrou à retirer pour \`${path}\`.`,
+        );
         return;
     }
 
-    await interaction.editReply({
-        content: `✅ **Réussite** — \`${path}\` synchronisé pour : ${selectedOwners.map(o => `**@${o}**`).join(', ')}.`,
-        components: [],
-    });
+    await sendEphemeralResult(
+        interaction,
+        `✅ **Réussite** — \`${path}\` synchronisé pour : ${selectedOwners.map(o => `**@${o}**`).join(', ')}.`,
+    );
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('lock-panel')
-        .setDescription('Affiche le panneau de synchronisation des verrous'),
+        .setDescription('Ouvre le panneau de synchronisation des verrous (éphémère)'),
 
     async execute(interaction) {
-        const button = new ButtonBuilder()
-            .setCustomId('open_lock_modal')
-            .setLabel('🔒 Synchroniser un verrou')
-            .setStyle(ButtonStyle.Primary);
-
-        const row = new ActionRowBuilder().addComponents(button);
-
         await interaction.reply({
-            content: '### 🛡️ Gestionnaire GitOps des Verrous\nChoisissez un chemin pour créer, modifier ou retirer un verrou.',
-            components: [row],
+            ...buildLockPanelPayload(),
+            ephemeral: true,
         });
     },
 
     async handleInteraction(interaction) {
-        if (interaction.isButton() && interaction.customId === 'open_lock_modal') {
+        if (!isLockPanelChannel(interaction)) {
+            return denyWrongChannel(interaction);
+        }
+
+        if (interaction.isButton() && interaction.customId === OPEN_LOCK_MODAL) {
             const modal = new ModalBuilder()
                 .setCustomId('lock_path_modal')
                 .setTitle('Chemin à synchroniser');
@@ -118,23 +144,25 @@ module.exports = {
 
         if (interaction.isModalSubmit() && interaction.customId === 'lock_path_modal') {
             const pathParam = interaction.fields.getTextInputValue('lock_path');
-            await interaction.deferReply();
+            await interaction.deferReply({ ephemeral: true });
 
             try {
                 const { locks } = await fetchLockownersFile();
                 const resolution = resolvePathForSync(pathParam, locks);
 
                 if (resolution.action === 'error') {
-                    return interaction.editReply({ content: resolution.message, components: [] });
+                    await sendEphemeralResult(interaction, resolution.message);
+                    return;
                 }
 
                 const collaborators = await listCollaborators();
 
                 if (!collaborators || collaborators.length === 0) {
-                    return interaction.editReply({
-                        content: '❌ **Échec** — Aucun collaborateur trouvé sur ce dépôt GitHub.',
-                        components: [],
-                    });
+                    await sendEphemeralResult(
+                        interaction,
+                        '❌ **Échec** — Aucun collaborateur trouvé sur ce dépôt GitHub.',
+                    );
+                    return;
                 }
 
                 const logins = collaborators.map(member => member.login);
@@ -160,27 +188,30 @@ module.exports = {
             } catch (error) {
                 console.error(error);
                 clearSession(interaction.user.id);
-                return interaction.editReply({
-                    content: `❌ **Échec** — ${error.message}`,
-                    components: [],
-                });
+                await sendEphemeralResult(interaction, `❌ **Échec** — ${error.message}`);
             }
+            return;
         }
 
         if (!interaction.isButton()) return;
 
         const session = getSession(interaction.user.id);
         if (!session) {
-            return interaction.reply({
-                content: '❌ **Échec** — Session expirée. Veuillez relancer `/lock-panel`.',
+            await interaction.reply({
+                content: '❌ **Échec** — Session expirée. Cliquez à nouveau sur le message épinglé.',
+                ephemeral: true,
             });
+            scheduleEphemeralCleanup(interaction);
+            return;
         }
 
         const toggleLogin = parseToggleLogin(interaction.customId);
 
         if (toggleLogin) {
             if (!session.logins.includes(toggleLogin)) {
-                return interaction.reply({ content: '❌ **Échec** — Collaborateur inconnu.' });
+                await interaction.reply({ content: '❌ **Échec** — Collaborateur inconnu.', ephemeral: true });
+                scheduleEphemeralCleanup(interaction);
+                return;
             }
 
             if (session.selected.has(toggleLogin)) {
@@ -218,9 +249,10 @@ module.exports = {
                 await commitSync(interaction, session);
             } catch (error) {
                 console.error(error);
-                await interaction.followUp({
-                    content: `❌ **Échec** — Erreur API GitHub : ${error.message}`,
-                });
+                await sendEphemeralResult(
+                    interaction,
+                    `❌ **Échec** — Erreur API GitHub : ${error.message}`,
+                );
             }
         }
     },

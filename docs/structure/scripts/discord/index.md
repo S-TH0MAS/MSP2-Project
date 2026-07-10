@@ -10,7 +10,8 @@ scripts/discord/
 ├── bot-server.js           # Dev — bot persistant (/lock-panel)
 ├── deploy-commands.js      # Enregistre les commandes slash
 ├── config/
-│   └── data.js             # Catégories, salons, mots-clés sync
+│   ├── data.js             # Catégories, salons, mots-clés sync
+│   └── info-messages.js    # Messages d'info structurés (extensible)
 ├── commands/
 │   ├── index.js            # Registre des commandes slash
 │   └── lock-panel.js       # /lock-panel — verrous GitOps
@@ -45,6 +46,8 @@ scripts/discord/
 | `sync.js` | Synchronisation fichiers ↔ messages |
 | `positions.js` | Ordre des catégories et salons |
 | `welcome.js` | Message d'accueil en lecture seule (GitOps) |
+| `info.js` | Messages d'information structurés (GitOps) |
+| `panel.js` | Panneau épinglé lockowners (bouton d'action) |
 
 ## Modules `lib/bot/` (runtime)
 
@@ -55,17 +58,27 @@ scripts/discord/
 | `lock-sync.js` | Résolution du chemin (parent / exact / libre) pour la sync |
 | `github.js` | API GitHub — lecture/écriture `.lockowners` (sync) |
 | `owner-selection.js` | UI tableau de sélection des propriétaires |
+| `audit-log.js` | Journal des actions lockowners vers le salon LOGS |
+| `channels-config.js` | Résolution des salons par configuration |
+| `lock-panel-ui.js` | Contenu et bouton du panneau lockowners |
+| `ephemeral.js` | Suppression auto des réponses éphémères |
 
 Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
 
 ## `/lock-panel` — synchronisation des verrous
 
-1. Saisie d'un chemin fichier ou dossier.
+**Point d'entrée** : message épinglé dans `🔒┃lockowners` (OPTIONS & COMMANDES).
+
+1. Clic sur le bouton épinglé → saisie du chemin.
 2. **Parent existant** — erreur avec le chemin du verrou parent.
 3. **Verrou exact** — panneau sync avec propriétaires pré-sélectionnés (ajout/retrait).
 4. **Aucun verrou** — panneau sync vide (création).
 5. **Validation sans propriétaire** — suppression de la ligne dans `.lockowners`.
 6. **Enfants existants** — erreur si le chemin engloberait des verrous plus spécifiques.
+
+**UX** : les étapes sont **éphémères** (visibles uniquement par l'utilisateur) et le message de résultat s'efface après 5 s.
+
+**Audit** : chaque action réussie est enregistrée dans `🔒┃lockowners-logs` (📋 LOGS), ex. `Thomaz#1234 a ajouté @S-TH0MAS sur scripts/discord/`.
 
 ## Prérequis
 
@@ -111,6 +124,16 @@ Le salon `👋┃accueil` est configuré avec `landing_channel: true` dans `data
 
 Sans serveur communautaire, le salon reste visible en **haut de la liste** à gauche — c'est le premier qu'ils voient en ouvrant 🏠 GENERAL.
 
+## Messages d'information (`info_message`)
+
+Le salon `ℹ️┃info` affiche un message structuré défini dans `config/info-messages.js`.
+
+Pour ajouter un nouveau bloc :
+1. Ajouter une entrée dans `info-messages.js` (`title`, `intro`, `sections`, `outro`)
+2. Référencer la clé via `info_message: 'maCle'` sur un salon read-only
+
+Le contenu est synchronisé à chaque `configure.js` (création, mise à jour, suppression des doublons).
+
 ## Configuration (`config/data.js`)
 
 | Champ | Description |
@@ -122,6 +145,9 @@ Sans serveur communautaire, le salon reste visible en **haut de la liste** à ga
 | `sync_files` | Mots-clés métier (`['init']`, etc.) |
 | `welcome_message` | Texte Markdown synchronisé comme message d'accueil (salon read-only) |
 | `landing_channel` | Salon d'accueil : premier dans la catégorie + message épinglé |
+| `pinned_panel` | Panneau épinglé (`'lock-panel'`) |
+| `audit_log` | Clé du journal d'audit (`'lockowners'`) |
+| `info_message` | Clé du message d'info (`config/info-messages.js`) |
 
 ### Salons configurés
 
@@ -129,7 +155,8 @@ Sans serveur communautaire, le salon reste visible en **haut de la liste** à ga
 |-----------|--------|
 | 🏠 GENERAL | 👋┃accueil (page d'accueil), 💬┃chat, 📊┃suivie-du-projet (lecture seule), 🔊┃chat-audio-general |
 | 💡 CONCEPTION | 🚀┃initialisation (`init`), 📝┃conception (`conception`) |
-| ⚙️ OPTIONS & COMMANDES | 🔒┃lockowners (chat — commandes `/lock-panel`) |
+| ⚙️ OPTIONS & COMMANDES | ℹ️┃info (sync fichiers), 🔒┃lockowners (panneau épinglé, read-only) |
+| 📋 LOGS | 🔒┃lockowners-logs (audit lockowners, read-only) |
 
 ## Build standalone
 

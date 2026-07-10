@@ -1,7 +1,7 @@
 /**
  * Point d'entrée du bundle standalone — ne pas lancer en dev (utiliser bot-server.js).
  */
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, Events } from 'discord.js';
 import * as sharedEnv from '../lib/bot/env.js';
 import * as commandsLib from '../lib/bot/commands.js';
 import * as lockPanelModule from '../commands/lock-panel.js';
@@ -15,7 +15,7 @@ const client = new Client({
 const { commands } = commandsLib.loadCommands([lockPanelModule]);
 client.commands = commands;
 
-client.once('ready', () => {
+client.once(Events.ClientReady, () => {
     console.log(`🤖 Bot connecté avec succès en tant que ${client.user.tag}!`);
 });
 

@@ -1,5 +1,5 @@
 const path = require('path');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Events } = require('discord.js');
 const { loadEnv } = require('./lib/bot/env');
 const { loadCommands } = require('./lib/bot/commands');
 
@@ -12,7 +12,7 @@ const client = new Client({
 const { commands } = loadCommands(path.join(__dirname, 'commands'));
 client.commands = commands;
 
-client.once('ready', () => {
+client.once(Events.ClientReady, () => {
     console.log(`🤖 Bot connecté avec succès en tant que ${client.user.tag}!`);
 });
 

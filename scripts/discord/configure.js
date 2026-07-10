@@ -1,10 +1,13 @@
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 const config = require('./config/data');
+const infoMessages = require('./config/info-messages');
 const { loadEnv } = require('./lib/bot/env');
 const { ChannelType, getChannelType, getPermissionOverwrites } = require('./lib/sync/channels');
 const { indexFilesByKey } = require('./lib/sync/files');
 const { syncChannelFiles } = require('./lib/sync/sync');
 const { syncWelcomeMessage } = require('./lib/sync/welcome');
+const { syncInfoMessage } = require('./lib/sync/info');
+const { syncPinnedPanel } = require('./lib/sync/panel');
 const { syncChannelOrder } = require('./lib/sync/positions');
 
 loadEnv();
@@ -44,6 +47,17 @@ client.once(Events.ClientReady, async () => {
                 );
 
                 if (!channel) {
+                    const misplaced = guild.channels.cache.find(
+                        c => c.name === chanData.name && c.type === channelType && c.parentId !== category.id,
+                    );
+                    if (misplaced) {
+                        await misplaced.setParent(category.id);
+                        channel = misplaced;
+                        console.log(`  ↪️ Salon déplacé : ${chanData.name} → [${catData.name}]`);
+                    }
+                }
+
+                if (!channel) {
                     channel = await guild.channels.create({
                         name: chanData.name,
                         type: channelType,
@@ -53,6 +67,15 @@ client.once(Events.ClientReady, async () => {
                     console.log(`  🔹 Salon créé : ${chanData.name} (${chanData.type || 'text'})`);
                 } else {
                     console.log(`  🔸 Salon existant (Historique préservé) : ${chanData.name}`);
+                    if (chanData.read_only && channelType === ChannelType.GuildText) {
+                        const overwrites = getPermissionOverwrites(guild, chanData);
+                        if (overwrites.length > 0) {
+                            await channel.permissionOverwrites.edit(
+                                guild.roles.everyone,
+                                { SendMessages: false },
+                            );
+                        }
+                    }
                 }
 
                 if (chanData.landing_channel) {
@@ -84,6 +107,19 @@ client.once(Events.ClientReady, async () => {
                     await syncWelcomeMessage(channel, chanData.welcome_message, client.user.id, {
                         pin: Boolean(chanData.landing_channel),
                     });
+                }
+
+                if (chanData.info_message && channelType === ChannelType.GuildText) {
+                    const definition = infoMessages[chanData.info_message];
+                    if (!definition) {
+                        console.warn(`    ⚠️ Message info inconnu : "${chanData.info_message}"`);
+                    } else {
+                        await syncInfoMessage(channel, definition, client.user.id);
+                    }
+                }
+
+                if (chanData.pinned_panel === 'lock-panel' && channelType === ChannelType.GuildText) {
+                    await syncPinnedPanel(channel, client.user.id);
                 }
             }
         }
