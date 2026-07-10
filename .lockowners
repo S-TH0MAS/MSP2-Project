@@ -1,6 +1,9 @@
 # Fichier de verrouillage d'infrastructure — MSP2-Project
 # Format : chemin/du/fichier_ou_dossier @Pseudo1 @Pseudo2 ...
 
+.github @S-TH0MAS
+.lockowners @S-TH0MAS
+
 scripts/discord @S-TH0MAS
 scripts/lib @S-TH0MAS
 scripts/lockowners @S-TH0MAS
