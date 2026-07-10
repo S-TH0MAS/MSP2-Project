@@ -1,15 +1,17 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Events } = require('discord.js');
 const config = require('./config/data');
 const { loadEnv } = require('./lib/bot/env');
 const { ChannelType, getChannelType, getPermissionOverwrites } = require('./lib/sync/channels');
 const { indexFilesByKey } = require('./lib/sync/files');
 const { syncChannelFiles } = require('./lib/sync/sync');
+const { syncWelcomeMessage } = require('./lib/sync/welcome');
+const { syncChannelOrder } = require('./lib/sync/positions');
 
 loadEnv();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
     console.log(`🤖 Bot connecté : ${client.user.tag}`);
 
     const guildId = process.env.DISCORD_GUILD_ID;
@@ -25,6 +27,8 @@ client.once('ready', async () => {
 
         const filesByKey = indexFilesByKey(config.FILES_DIR);
         console.log(`📂 Recherche dans ${config.FILES_DIR}/ — mots-clés trouvés : ${[...filesByKey.keys()].join(', ') || 'aucun'}`);
+
+        let landingChannel = null;
 
         for (const catData of config.categories) {
             let category = guild.channels.cache.find(c => c.name === catData.name && c.type === ChannelType.GuildCategory);
@@ -51,10 +55,42 @@ client.once('ready', async () => {
                     console.log(`  🔸 Salon existant (Historique préservé) : ${chanData.name}`);
                 }
 
+                if (chanData.landing_channel) {
+                    landingChannel = channel;
+                }
+            }
+        }
+
+        await syncChannelOrder(guild, config.categories);
+
+        for (const catData of config.categories) {
+            const category = guild.channels.cache.find(
+                c => c.name === catData.name && c.type === ChannelType.GuildCategory,
+            );
+            if (!category) continue;
+
+            for (const chanData of catData.channels) {
+                const channelType = getChannelType(chanData);
+                const channel = guild.channels.cache.find(
+                    c => c.name === chanData.name && c.parentId === category.id && c.type === channelType,
+                );
+                if (!channel) continue;
+
                 if (chanData.sync_files && channelType === ChannelType.GuildText) {
                     await syncChannelFiles(channel, chanData, filesByKey, config.FILES_DIR);
                 }
+
+                if (chanData.welcome_message && channelType === ChannelType.GuildText) {
+                    await syncWelcomeMessage(channel, chanData.welcome_message, client.user.id, {
+                        pin: Boolean(chanData.landing_channel),
+                    });
+                }
             }
+        }
+
+        if (landingChannel) {
+            console.log(`🏠 Salon d'accueil : #${landingChannel.name}`);
+            console.log('   💡 Pour les nouveaux membres : Discord → Paramètres serveur → Guide du serveur → Salons par défaut → ajouter ce salon');
         }
         console.log('✅ Tout est synchronisé !');
     } catch (error) {

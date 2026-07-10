@@ -43,6 +43,8 @@ scripts/discord/
 | `git.js` | Message Discord = dernier commit Git |
 | `messages.js` | Pagination de l'historique d'un salon |
 | `sync.js` | Synchronisation fichiers ↔ messages |
+| `positions.js` | Ordre des catégories et salons |
+| `welcome.js` | Message d'accueil en lecture seule (GitOps) |
 
 ## Modules `lib/bot/` (runtime)
 
@@ -92,6 +94,23 @@ Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
 4. Supprime les messages dont le fichier local a disparu
 5. Contenu du message = description du dernier commit Git
 
+## Page d'accueil (`landing_channel`)
+
+Le salon `👋┃accueil` est configuré avec `landing_channel: true` dans `data.js`.
+
+**Automatique (via `configure.js`)** :
+1. Placé en **premier** dans sa catégorie (et 🏠 GENERAL en première catégorie)
+2. Message d'accueil synchronisé et **épinglé**
+
+**Manuel (recommandé pour les nouveaux membres)** — nécessite un [serveur communautaire Discord](https://support.discord.com/hc/fr/articles/4403205878423) :
+
+1. **Paramètres du serveur** → **Guide du serveur** (Onboarding)
+2. Activer le guide du serveur
+3. Dans **Salons par défaut**, ajouter `👋┃accueil`
+4. Les nouveaux membres verront ce salon mis en avant à leur arrivée
+
+Sans serveur communautaire, le salon reste visible en **haut de la liste** à gauche — c'est le premier qu'ils voient en ouvrant 🏠 GENERAL.
+
 ## Configuration (`config/data.js`)
 
 | Champ | Description |
@@ -101,12 +120,14 @@ Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
 | `type` | `'text'` ou `'voice'` |
 | `read_only` | Interdit l'envoi de messages à `@everyone` |
 | `sync_files` | Mots-clés métier (`['init']`, etc.) |
+| `welcome_message` | Texte Markdown synchronisé comme message d'accueil (salon read-only) |
+| `landing_channel` | Salon d'accueil : premier dans la catégorie + message épinglé |
 
 ### Salons configurés
 
 | Catégorie | Salons |
 |-----------|--------|
-| 🏠 GENERAL | 💬┃chat, 📊┃suivie-du-projet (lecture seule), 🔊┃chat-audio-general |
+| 🏠 GENERAL | 👋┃accueil (page d'accueil), 💬┃chat, 📊┃suivie-du-projet (lecture seule), 🔊┃chat-audio-general |
 | 💡 CONCEPTION | 🚀┃initialisation (`init`), 📝┃conception (`conception`) |
 | ⚙️ OPTIONS & COMMANDES | 🔒┃lockowners (chat — commandes `/lock-panel`) |
 

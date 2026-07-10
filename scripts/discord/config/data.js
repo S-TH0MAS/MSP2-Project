@@ -11,16 +11,35 @@
  *   - read_only   : true = @everyone ne peut pas envoyer de messages (salons texte)
  *   - sync_files  : liste de mots-clés métier — le script envoie les fichiers
  *                   correspondants (filename.{mot-clé}.discord.ext) trouvés dans FILES_DIR
+ *   - welcome_message : texte Markdown affiché en lecture seule (message d'accueil GitOps)
+ *   - landing_channel : true = salon d'accueil (premier dans la catégorie, message épinglé)
  */
 
 const FILES_DIR = 'docs';
+const GITHUB_REPO_URL = 'https://github.com/S-TH0MAS/MSP2-Project';
+
+const WELCOME_HOME = [
+  '# 👋 Bienvenue sur MSP2-Project',
+  '',
+  'Serveur Discord officiel du projet **MSP2-Project**.',
+  '',
+  `🔗 **Dépôt GitHub** : ${GITHUB_REPO_URL}`,
+].join('\n');
 
 module.exports = {
   FILES_DIR,
+  GITHUB_REPO_URL,
   categories: [
     {
       name: '🏠 GENERAL',
       channels: [
+        {
+          name: '👋┃accueil',
+          type: 'text',
+          read_only: true,
+          landing_channel: true,
+          welcome_message: WELCOME_HOME,
+        },
         {
           name: '💬┃chat',
           type: 'text',
