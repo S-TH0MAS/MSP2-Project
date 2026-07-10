@@ -15,14 +15,19 @@ function parseToggleLogin(customId) {
 }
 
 function formatSelectedOwners(selected) {
-    if (!selected || selected.size === 0) return '_aucun — sélectionnez au moins un compte_';
+    if (!selected || selected.size === 0) return '_aucun — le verrou sera retiré à la validation_';
     return [...selected].map(login => `**@${login}**`).join(', ');
 }
 
-function buildOwnerSelectionContent(path, selected) {
+function buildOwnerSelectionContent(path, selected, isExisting) {
+    const mode = isExisting
+        ? 'Ajustez les propriétaires existants (retirer tous = suppression du verrou).'
+        : 'Sélectionnez les propriétaires pour créer le verrou.';
+
     return [
-        `### 👤 2/2 - Propriétaires pour \`${path}\``,
-        'Cliquez sur les lignes du tableau pour sélectionner ou désélectionner, puis **Valider**.',
+        `### 👤 Sync — \`${path}\``,
+        mode,
+        'Cliquez sur les comptes pour ajouter ou retirer, puis **Valider**.',
         '',
         '| Sélection |',
         '| --- |',
@@ -30,9 +35,10 @@ function buildOwnerSelectionContent(path, selected) {
     ].join('\n');
 }
 
-function buildOwnerSelectionComponents(logins, selected) {
+function buildOwnerSelectionComponents(logins, selected, initialOwners) {
     const visibleLogins = logins.slice(0, USERS_PER_ROW * MAX_USER_ROWS);
     const rows = [];
+    const hasChanges = !setsEqual(selected, initialOwners);
 
     for (let i = 0; i < visibleLogins.length; i += USERS_PER_ROW) {
         const chunk = visibleLogins.slice(i, i + USERS_PER_ROW);
@@ -51,28 +57,40 @@ function buildOwnerSelectionComponents(logins, selected) {
         rows.push(row);
     }
 
+    const confirmLabel = selected.size === 0 ? '🗑️ Retirer le verrou' : '✅ Valider';
+
     rows.push(
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(CUSTOM_IDS.CONFIRM)
-                .setLabel('✅ Valider')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(selected.size === 0),
+                .setLabel(confirmLabel)
+                .setStyle(selected.size === 0 ? ButtonStyle.Danger : ButtonStyle.Primary)
+                .setDisabled(!hasChanges),
             new ButtonBuilder()
                 .setCustomId(CUSTOM_IDS.RESET)
                 .setLabel('🔄 Réinitialiser')
                 .setStyle(ButtonStyle.Secondary)
-                .setDisabled(selected.size === 0),
+                .setDisabled(!hasChanges),
         ),
     );
 
     return rows;
 }
 
-function buildOwnerSelectionPayload(path, logins, selected) {
+function setsEqual(a, b) {
+    if (a.size !== b.size) return false;
+    for (const value of a) {
+        if (!b.has(value)) return false;
+    }
+    return true;
+}
+
+function buildOwnerSelectionPayload(path, logins, selected, initialOwners) {
+    const isExisting = initialOwners.size > 0;
+
     return {
-        content: buildOwnerSelectionContent(path, selected),
-        components: buildOwnerSelectionComponents(logins, selected),
+        content: buildOwnerSelectionContent(path, selected, isExisting),
+        components: buildOwnerSelectionComponents(logins, selected, initialOwners),
     };
 }
 

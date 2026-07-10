@@ -50,11 +50,20 @@ scripts/discord/
 |--------|------|
 | `env.js` | Variables Discord (`scripts/lib/env` + validation) |
 | `commands.js` | Chargement des commandes slash |
-| `github.js` | API GitHub — `.lockowners`, collaborateurs |
-| `validate-lock.js` | Validation des nouveaux verrous (UI Discord) |
+| `lock-sync.js` | Résolution du chemin (parent / exact / libre) pour la sync |
+| `github.js` | API GitHub — lecture/écriture `.lockowners` (sync) |
 | `owner-selection.js` | UI tableau de sélection des propriétaires |
 
 Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
+
+## `/lock-panel` — synchronisation des verrous
+
+1. Saisie d'un chemin fichier ou dossier.
+2. **Parent existant** — erreur avec le chemin du verrou parent.
+3. **Verrou exact** — panneau sync avec propriétaires pré-sélectionnés (ajout/retrait).
+4. **Aucun verrou** — panneau sync vide (création).
+5. **Validation sans propriétaire** — suppression de la ligne dans `.lockowners`.
+6. **Enfants existants** — erreur si le chemin engloberait des verrous plus spécifiques.
 
 ## Prérequis
 

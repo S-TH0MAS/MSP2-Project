@@ -1,5 +1,5 @@
 const { Octokit } = require('@octokit/rest');
-const { parseLockowners } = require('../../../lib/lockowners');
+const { parseLockowners, normalizePath } = require('../../../lib/lockowners');
 
 const REPO_OWNER = 'S-TH0MAS';
 const REPO_NAME = 'MSP2-Project';
@@ -43,18 +43,61 @@ async function listCollaborators(octokit = getOctokit()) {
     return data;
 }
 
-async function appendLockownersLine(pathParam, owners, octokit = getOctokit()) {
+function applyLockSync(content, pathParam, owners) {
+    const normalized = normalizePath(pathParam);
+    const ownerSuffix = owners.map(username => `@${username}`).join(' ');
+    const lines = content.length > 0 ? content.split('\n') : [];
+    const result = [];
+    let replaced = false;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+
+        if (!trimmed || trimmed.startsWith('#')) {
+            result.push(line);
+            continue;
+        }
+
+        const parts = trimmed.split(/\s+/);
+        if (parts.length < 2) {
+            result.push(line);
+            continue;
+        }
+
+        const pattern = normalizePath(parts[0]);
+
+        if (pattern === normalized) {
+            replaced = true;
+            if (owners.length > 0) {
+                result.push(`${normalized} ${ownerSuffix}`);
+            }
+            continue;
+        }
+
+        result.push(line);
+    }
+
+    if (!replaced && owners.length > 0) {
+        result.push(`${normalized} ${ownerSuffix}`);
+    }
+
+    return result.join('\n').replace(/\s+$/, '');
+}
+
+async function syncLockownersLine(pathParam, owners, octokit = getOctokit()) {
     const { fileSha, currentContent } = await fetchLockownersFile(octokit);
-    const ownersString = owners.map(username => `@${username}`).join(' ');
-    const newLockLine = `${pathParam} ${ownersString}`;
-    const updatedContent = currentContent ? `${currentContent}\n${newLockLine}` : newLockLine;
+    const updatedContent = applyLockSync(currentContent, pathParam, owners);
+    const isRemoval = owners.length === 0;
+    const message = isRemoval
+        ? `chore(security): retrait du verrou ${pathParam} depuis Discord`
+        : `chore(security): sync verrous pour ${pathParam} depuis Discord`;
 
     await octokit.repos.createOrUpdateFileContents({
         owner: REPO_OWNER,
         repo: REPO_NAME,
         path: LOCK_FILE_PATH,
         branch: BRANCH,
-        message: `chore(security): verrous multiples pour ${pathParam} depuis Discord`,
+        message,
         content: Buffer.from(updatedContent).toString('base64'),
         sha: fileSha,
     });
@@ -68,5 +111,6 @@ module.exports = {
     getOctokit,
     fetchLockownersFile,
     listCollaborators,
-    appendLockownersLine,
+    applyLockSync,
+    syncLockownersLine,
 };

@@ -7,8 +7,8 @@ const {
     TextInputBuilder,
     TextInputStyle,
 } = require('discord.js');
-const { validatePath } = require('../lib/bot/validate-lock');
-const { fetchLockownersFile, listCollaborators, appendLockownersLine } = require('../lib/bot/github');
+const { resolvePathForSync } = require('../lib/bot/lock-sync');
+const { fetchLockownersFile, listCollaborators, syncLockownersLine } = require('../lib/bot/github');
 const {
     CUSTOM_IDS,
     parseToggleLogin,
@@ -17,7 +17,7 @@ const {
     MAX_USER_ROWS,
 } = require('../lib/bot/owner-selection');
 
-/** @type {Map<string, { path: string, selected: Set<string>, logins: string[] }>} */
+/** @type {Map<string, { path: string, selected: Set<string>, initialOwners: Set<string>, logins: string[] }>} */
 const sessions = new Map();
 
 function getSession(userId) {
@@ -28,30 +28,54 @@ function clearSession(userId) {
     sessions.delete(userId);
 }
 
-function startSession(userId, path, logins) {
-    const session = { path, selected: new Set(), logins };
+function startSession(userId, path, logins, existingOwners = []) {
+    const initialOwners = new Set(existingOwners);
+    const session = {
+        path,
+        selected: new Set(existingOwners),
+        initialOwners,
+        logins,
+    };
     sessions.set(userId, session);
     return session;
 }
 
-async function commitLock(interaction, session) {
-    const { path, selected } = session;
-
+async function commitSync(interaction, session) {
+    const { path, selected, initialOwners } = session;
     const { locks } = await fetchLockownersFile();
-    const validation = validatePath(path, locks);
+    const resolution = resolvePathForSync(path, locks);
 
-    if (!validation.valid) {
+    if (resolution.action === 'error') {
         clearSession(interaction.user.id);
-        await interaction.editReply({ content: validation.message, components: [] });
+        await interaction.editReply({ content: resolution.message, components: [] });
         return;
     }
 
     const selectedOwners = [...selected];
-    await appendLockownersLine(path, selectedOwners);
+    const isRemoval = selectedOwners.length === 0;
+    const hadExisting = initialOwners.size > 0;
+
+    await syncLockownersLine(path, selectedOwners);
     clearSession(interaction.user.id);
 
+    if (isRemoval && hadExisting) {
+        await interaction.editReply({
+            content: `✅ **Réussite** — Le verrou sur \`${path}\` a été retiré.`,
+            components: [],
+        });
+        return;
+    }
+
+    if (isRemoval) {
+        await interaction.editReply({
+            content: `ℹ️ Aucun verrou à retirer pour \`${path}\`.`,
+            components: [],
+        });
+        return;
+    }
+
     await interaction.editReply({
-        content: `✅ **Réussite** — \`${path}\` est verrouillé pour : ${selectedOwners.map(o => `**@${o}**`).join(', ')}.`,
+        content: `✅ **Réussite** — \`${path}\` synchronisé pour : ${selectedOwners.map(o => `**@${o}**`).join(', ')}.`,
         components: [],
     });
 }
@@ -59,18 +83,18 @@ async function commitLock(interaction, session) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('lock-panel')
-        .setDescription('Affiche le bouton de création graphique de verrous'),
+        .setDescription('Affiche le panneau de synchronisation des verrous'),
 
     async execute(interaction) {
         const button = new ButtonBuilder()
             .setCustomId('open_lock_modal')
-            .setLabel('🔒 Verrouiller un dossier / fichier')
+            .setLabel('🔒 Synchroniser un verrou')
             .setStyle(ButtonStyle.Primary);
 
         const row = new ActionRowBuilder().addComponents(button);
 
         await interaction.reply({
-            content: '### 🛡️ Gestionnaire GitOps des Verrous\nCliquez sur le bouton ci-dessous pour sécuriser un emplacement.',
+            content: '### 🛡️ Gestionnaire GitOps des Verrous\nChoisissez un chemin pour créer, modifier ou retirer un verrou.',
             components: [row],
         });
     },
@@ -79,11 +103,11 @@ module.exports = {
         if (interaction.isButton() && interaction.customId === 'open_lock_modal') {
             const modal = new ModalBuilder()
                 .setCustomId('lock_path_modal')
-                .setTitle('1/2 - Emplacement du verrou');
+                .setTitle('Chemin à synchroniser');
 
             const pathInput = new TextInputBuilder()
                 .setCustomId('lock_path')
-                .setLabel('Chemin du fichier ou dossier à protéger')
+                .setLabel('Chemin du fichier ou dossier')
                 .setPlaceholder('ex: scripts/discord/configure.js')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
@@ -98,10 +122,10 @@ module.exports = {
 
             try {
                 const { locks } = await fetchLockownersFile();
-                const validation = validatePath(pathParam, locks);
+                const resolution = resolvePathForSync(pathParam, locks);
 
-                if (!validation.valid) {
-                    return interaction.editReply({ content: validation.message, components: [] });
+                if (resolution.action === 'error') {
+                    return interaction.editReply({ content: resolution.message, components: [] });
                 }
 
                 const collaborators = await listCollaborators();
@@ -114,8 +138,18 @@ module.exports = {
                 }
 
                 const logins = collaborators.map(member => member.login);
-                const session = startSession(interaction.user.id, validation.normalized, logins);
-                const payload = buildOwnerSelectionPayload(session.path, session.logins, session.selected);
+                const session = startSession(
+                    interaction.user.id,
+                    resolution.normalized,
+                    logins,
+                    resolution.existingOwners,
+                );
+                const payload = buildOwnerSelectionPayload(
+                    session.path,
+                    session.logins,
+                    session.selected,
+                    session.initialOwners,
+                );
 
                 const maxVisible = USERS_PER_ROW * MAX_USER_ROWS;
                 if (logins.length > maxVisible) {
@@ -156,28 +190,32 @@ module.exports = {
             }
 
             return interaction.update(
-                buildOwnerSelectionPayload(session.path, session.logins, session.selected),
+                buildOwnerSelectionPayload(
+                    session.path,
+                    session.logins,
+                    session.selected,
+                    session.initialOwners,
+                ),
             );
         }
 
         if (interaction.customId === CUSTOM_IDS.RESET) {
-            session.selected.clear();
+            session.selected = new Set(session.initialOwners);
             return interaction.update(
-                buildOwnerSelectionPayload(session.path, session.logins, session.selected),
+                buildOwnerSelectionPayload(
+                    session.path,
+                    session.logins,
+                    session.selected,
+                    session.initialOwners,
+                ),
             );
         }
 
         if (interaction.customId === CUSTOM_IDS.CONFIRM) {
-            if (session.selected.size === 0) {
-                return interaction.reply({
-                    content: '❌ **Échec** — Sélectionnez au moins un propriétaire avant de valider.',
-                });
-            }
-
             await interaction.deferUpdate();
 
             try {
-                await commitLock(interaction, session);
+                await commitSync(interaction, session);
             } catch (error) {
                 console.error(error);
                 await interaction.followUp({

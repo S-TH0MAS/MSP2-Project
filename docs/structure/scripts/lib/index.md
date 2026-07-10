@@ -13,7 +13,7 @@ Modules réutilisés par plusieurs services sous `scripts/`.
 
 | Service | Modules importés |
 |---------|------------------|
-| `scripts/discord/` | `lib/bot/env`, `lib/bot/github`, `lib/bot/validate-lock` ; `lib/sync/*` utilise `scripts/lib/env` |
+| `scripts/discord/` | `lib/bot/env`, `lib/bot/github`, `lib/bot/lock-sync` ; `lib/sync/*` utilise `scripts/lib/env` |
 | `scripts/lockowners/` | `env`, `lockowners` (via `check-locks.js`) |
 
 La logique spécifique reste dans `scripts/discord/lib/sync/`, `scripts/discord/lib/bot/` ou `scripts/lockowners/lib/`.
