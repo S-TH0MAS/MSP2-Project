@@ -108,6 +108,7 @@ Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
 |-----------|--------|
 | 🏠 GENERAL | 💬┃chat, 📊┃suivie-du-projet (lecture seule), 🔊┃chat-audio-general |
 | 💡 CONCEPTION | 🚀┃initialisation (`init`), 📝┃conception (`conception`) |
+| ⚙️ OPTIONS & COMMANDES | 🔒┃lockowners (chat — commandes `/lock-panel`) |
 
 ## Build standalone
 

@@ -53,5 +53,14 @@ module.exports = {
         },
       ],
     },
+    {
+      name: '⚙️ OPTIONS & COMMANDES',
+      channels: [
+        {
+          name: '🔒┃lockowners',
+          type: 'text',
+        },
+      ],
+    },
   ],
 };
