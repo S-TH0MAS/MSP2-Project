@@ -152,12 +152,14 @@ Le contenu est synchronisé à chaque `configure.js` (création, mise à jour, s
 | `pinned_panel` | Panneau épinglé (`'lock-panel'`) |
 | `audit_log` | Clé du journal d'audit (`'lockowners'`) |
 | `info_message` | Clé du message d'info (`config/info-messages.js`) |
+| `dev_only` (catégorie) | Visible uniquement par le rôle DEV |
 
 ### Salons configurés
 
 | Catégorie | Salons |
 |-----------|--------|
 | 🏠 GENERAL | 👋┃accueil (page d'accueil), 💬┃chat, 📊┃suivie-du-projet (lecture seule), 🔊┃chat-audio-general |
+| 👨‍💻 DEV (rôle DEV) | 💬┃chat-dev, 🔊┃chat-audio-dev |
 | 💡 CONCEPTION | 🚀┃initialisation (`init`), 📝┃conception (`conception`) |
 | ⚙️ OPTIONS & COMMANDES | ℹ️┃info (sync fichiers), 🔒┃lockowners (panneau épinglé, read-only) |
 | 📋 LOGS | 🔒┃lockowners-logs (audit lockowners, read-only) |

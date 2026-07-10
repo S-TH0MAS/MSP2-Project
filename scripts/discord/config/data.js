@@ -16,6 +16,9 @@
  *   - pinned_panel    : 'lock-panel' = message épinglé avec bouton d'action
  *   - audit_log       : clé du journal d'audit (ex. 'lockowners')
  *   - info_message    : clé du message d'info (voir config/info-messages.js)
+ *
+ * Champs disponibles par catégorie :
+ *   - dev_only        : true = visible uniquement par le rôle DEV (catégorie ou salon)
  */
 
 const FILES_DIR = 'docs';
@@ -29,6 +32,7 @@ const WELCOME_HOME = [
   '**Le projet** — plateforme sociale d\'**apprentissage C2C** (particulier à particulier) pour la transmission de savoir-faire entre **mentors** et **apprenants**. Actuellement en **phase de conception**.',
   '',
   '**Sur ce serveur**',
+  '- **👨‍💻 DEV** — espace réservé aux développeurs (sous GENERAL)',
   '- **💡 CONCEPTION** — présentation initiale et documents de conception',
   '- **⚙️ OPTIONS & COMMANDES** — infos, verrous dynamiques (`.lockowners`)',
   '- **📋 LOGS** — historique des actions sur les verrous',
@@ -62,6 +66,22 @@ module.exports = {
         {
           name: '🔊┃chat-audio-general',
           type: 'voice',
+        },
+      ],
+    },
+    {
+      name: '👨‍💻 DEV',
+      dev_only: true,
+      channels: [
+        {
+          name: '💬┃chat-dev',
+          type: 'text',
+          dev_only: true,
+        },
+        {
+          name: '🔊┃chat-audio-dev',
+          type: 'voice',
+          dev_only: true,
         },
       ],
     },

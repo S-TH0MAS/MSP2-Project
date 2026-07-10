@@ -2,7 +2,13 @@ const { Client, GatewayIntentBits, Events } = require('discord.js');
 const config = require('./config/data');
 const infoMessages = require('./config/info-messages');
 const { loadEnv } = require('./lib/bot/env');
-const { ChannelType, getChannelType, getPermissionOverwrites } = require('./lib/sync/channels');
+const {
+    ChannelType,
+    getChannelType,
+    getPermissionOverwrites,
+    getCategoryPermissionOverwrites,
+    applyDevOnlyPermissions,
+} = require('./lib/sync/channels');
 const { indexFilesByKey } = require('./lib/sync/files');
 const { syncChannelFiles } = require('./lib/sync/sync');
 const { syncWelcomeMessage } = require('./lib/sync/welcome');
@@ -26,6 +32,7 @@ client.once(Events.ClientReady, async () => {
 
     try {
         const guild = await client.guilds.fetch(guildId);
+        await guild.roles.fetch();
         console.log(`⚡ Déploiement de l'infrastructure pour : ${guild.name}`);
 
         const filesByKey = indexFilesByKey(config.FILES_DIR);
@@ -36,8 +43,21 @@ client.once(Events.ClientReady, async () => {
         for (const catData of config.categories) {
             let category = guild.channels.cache.find(c => c.name === catData.name && c.type === ChannelType.GuildCategory);
             if (!category) {
-                category = await guild.channels.create({ name: catData.name, type: ChannelType.GuildCategory });
+                const createOptions = {
+                    name: catData.name,
+                    type: ChannelType.GuildCategory,
+                };
+                const categoryOverwrites = getCategoryPermissionOverwrites(guild, catData);
+                if (categoryOverwrites.length > 0) {
+                    createOptions.permissionOverwrites = categoryOverwrites;
+                }
+                category = await guild.channels.create(createOptions);
                 console.log(`📁 Catégorie créée : [${catData.name}]`);
+            } else if (catData.dev_only) {
+                const applied = await applyDevOnlyPermissions(guild, category);
+                if (applied) {
+                    console.log(`  🔐 Permissions DEV appliquées : [${catData.name}]`);
+                }
             }
 
             for (const chanData of catData.channels) {
@@ -62,12 +82,18 @@ client.once(Events.ClientReady, async () => {
                         name: chanData.name,
                         type: channelType,
                         parent: category.id,
-                        permissionOverwrites: getPermissionOverwrites(guild, chanData),
+                        permissionOverwrites: getPermissionOverwrites(guild, chanData, catData),
                     });
                     console.log(`  🔹 Salon créé : ${chanData.name} (${chanData.type || 'text'})`);
                 } else {
                     console.log(`  🔸 Salon existant (Historique préservé) : ${chanData.name}`);
-                    if (chanData.read_only && channelType === ChannelType.GuildText) {
+
+                    if (catData.dev_only || chanData.dev_only) {
+                        const applied = await applyDevOnlyPermissions(guild, channel);
+                        if (applied) {
+                            console.log(`  🔐 Permissions DEV appliquées : ${chanData.name}`);
+                        }
+                    } else if (chanData.read_only && channelType === ChannelType.GuildText) {
                         const overwrites = getPermissionOverwrites(guild, chanData);
                         if (overwrites.length > 0) {
                             await channel.permissionOverwrites.edit(
