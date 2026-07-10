@@ -62,10 +62,13 @@ scripts/discord/
 | `channels-config.js` | Résolution des salons par configuration |
 | `lock-panel-ui.js` | Contenu et bouton du panneau lockowners |
 | `ephemeral.js` | Suppression auto des réponses éphémères |
+| `dev-role.js` | Vérification du rôle DEV pour `/lock-panel` |
 
 Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
 
 ## `/lock-panel` — synchronisation des verrous
+
+**Accès** : rôle **DEV** requis (configurable via `DISCORD_DEV_ROLE` dans `.env`, défaut `DEV`).
 
 **Point d'entrée** : message épinglé dans `🔒┃lockowners` (OPTIONS & COMMANDES).
 
@@ -97,6 +100,7 @@ Les fonctions communes (`.env`, parse `.lockowners`) sont dans `scripts/lib/`.
 |----------|-------------|
 | `DISCORD_BOT_TOKEN` | Tous les scripts |
 | `DISCORD_GUILD_ID` | `configure.js`, `deploy-commands.js` |
+| `DISCORD_DEV_ROLE` | `/lock-panel` — nom du rôle autorisé (défaut : `DEV`) |
 | `GITHUB_TOKEN` | `/lock-panel`, build standalone |
 
 ## `configure.js` — synchronisation

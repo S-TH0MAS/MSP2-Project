@@ -11,6 +11,7 @@ const { isLockPanelChannel, getLockPanelChannelName } = require('../lib/bot/chan
 const { logLockownersAction } = require('../lib/bot/audit-log');
 const { scheduleEphemeralCleanup } = require('../lib/bot/ephemeral');
 const { OPEN_LOCK_MODAL, buildLockPanelPayload } = require('../lib/bot/lock-panel-ui');
+const { hasDevRole, denyNoDevRole } = require('../lib/bot/dev-role');
 const {
     CUSTOM_IDS,
     parseToggleLogin,
@@ -115,6 +116,10 @@ module.exports = {
         .setDescription('Ouvre le panneau de synchronisation des verrous (éphémère)'),
 
     async execute(interaction) {
+        if (!hasDevRole(interaction)) {
+            return denyNoDevRole(interaction);
+        }
+
         await interaction.reply({
             ...buildLockPanelPayload(),
             ephemeral: true,
@@ -122,6 +127,10 @@ module.exports = {
     },
 
     async handleInteraction(interaction) {
+        if (!hasDevRole(interaction)) {
+            return denyNoDevRole(interaction);
+        }
+
         if (!isLockPanelChannel(interaction)) {
             return denyWrongChannel(interaction);
         }
