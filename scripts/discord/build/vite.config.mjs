@@ -39,7 +39,7 @@ export default defineConfig({
             transformMixedEsModules: true,
             requireReturnsDefault: 'preferred',
             defaultIsModuleExports: true,
-            include: [/node_modules/, /\/lib\//, /\/commands\//],
+            include: [/node_modules/, /\/lib\//, /\/commands\//, /\/config\//],
         },
         rollupOptions: {
             input: path.join(__dirname, 'standalone.mjs'),

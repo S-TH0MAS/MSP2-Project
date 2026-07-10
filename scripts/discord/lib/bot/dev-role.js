@@ -1,4 +1,5 @@
 const DEFAULT_DEV_ROLE = 'DEV';
+const { withEphemeral } = require('./reply-flags');
 
 function getDevRoleName() {
     return process.env.DISCORD_DEV_ROLE || DEFAULT_DEV_ROLE;
@@ -31,7 +32,7 @@ async function denyNoDevRole(interaction, { cleanup = true } = {}) {
     if (interaction.deferred || interaction.replied) {
         await interaction.editReply({ content, components: [] });
     } else {
-        await interaction.reply({ content, ephemeral: true });
+        await interaction.reply(withEphemeral({ content }));
     }
 
     if (cleanup) {

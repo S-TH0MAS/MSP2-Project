@@ -1,5 +1,7 @@
 const { ChannelType } = require('discord.js');
-const config = require('../../config/data');
+const { loadDataConfig } = require('./load-data-config');
+
+const config = loadDataConfig();
 
 function findChannelEntry(predicate) {
     for (const category of config.categories) {

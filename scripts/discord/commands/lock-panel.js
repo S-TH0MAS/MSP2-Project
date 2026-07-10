@@ -10,6 +10,7 @@ const { fetchLockownersFile, listCollaborators, syncLockownersLine } = require('
 const { isLockPanelChannel, getLockPanelChannelName } = require('../lib/bot/channels-config');
 const { logLockownersAction } = require('../lib/bot/audit-log');
 const { scheduleEphemeralCleanup } = require('../lib/bot/ephemeral');
+const { withEphemeral } = require('../lib/bot/reply-flags');
 const { OPEN_LOCK_MODAL, buildLockPanelPayload } = require('../lib/bot/lock-panel-ui');
 const { hasDevRole, denyNoDevRole } = require('../lib/bot/dev-role');
 const {
@@ -45,17 +46,16 @@ function startSession(userId, path, logins, existingOwners = []) {
 
 function denyWrongChannel(interaction) {
     const channelName = getLockPanelChannelName() ?? '🔒┃lockowners';
-    return interaction.reply({
+    return interaction.reply(withEphemeral({
         content: `❌ **Échec** — Utilisez le message épinglé dans **${channelName}**.`,
-        ephemeral: true,
-    });
+    }));
 }
 
 async function sendEphemeralResult(interaction, content) {
     if (interaction.deferred || interaction.replied) {
         await interaction.editReply({ content, components: [] });
     } else {
-        await interaction.reply({ content, ephemeral: true });
+        await interaction.reply(withEphemeral({ content }));
     }
     scheduleEphemeralCleanup(interaction);
 }
@@ -120,10 +120,9 @@ module.exports = {
             return denyNoDevRole(interaction);
         }
 
-        await interaction.reply({
+        await interaction.reply(withEphemeral({
             ...buildLockPanelPayload(),
-            ephemeral: true,
-        });
+        }));
     },
 
     async handleInteraction(interaction) {
@@ -153,7 +152,7 @@ module.exports = {
 
         if (interaction.isModalSubmit() && interaction.customId === 'lock_path_modal') {
             const pathParam = interaction.fields.getTextInputValue('lock_path');
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply(withEphemeral({}));
 
             try {
                 const { locks } = await fetchLockownersFile();
@@ -206,10 +205,9 @@ module.exports = {
 
         const session = getSession(interaction.user.id);
         if (!session) {
-            await interaction.reply({
+            await interaction.reply(withEphemeral({
                 content: '❌ **Échec** — Session expirée. Cliquez à nouveau sur le message épinglé.',
-                ephemeral: true,
-            });
+            }));
             scheduleEphemeralCleanup(interaction);
             return;
         }
@@ -218,7 +216,9 @@ module.exports = {
 
         if (toggleLogin) {
             if (!session.logins.includes(toggleLogin)) {
-                await interaction.reply({ content: '❌ **Échec** — Collaborateur inconnu.', ephemeral: true });
+                await interaction.reply(withEphemeral({
+                    content: '❌ **Échec** — Collaborateur inconnu.',
+                }));
                 scheduleEphemeralCleanup(interaction);
                 return;
             }
