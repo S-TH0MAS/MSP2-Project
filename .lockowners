@@ -2,3 +2,4 @@
 # Format : chemin/du/fichier_ou_dossier @Pseudo1 @Pseudo2 ...
 
 scripts/discord @S-TH0MAS
+scripts/lib @S-TH0MAS
